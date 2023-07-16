@@ -43,6 +43,7 @@
 
 #define TFT_BL          4  // Display backlight control pin
 #define ADC_EN          14  // Used for enabling battery voltage measurements - not used in this program
+#define ADC_PIN             34
 
 TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 
@@ -118,14 +119,31 @@ boolean hasDataChanged() {
   return false;
 }
 
+void setData() {
+  // Update last known values.
+  #if defined(ESP8266)
+  knownSsid = apActive ? WiFi.softAPSSID() : WiFi.SSID();
+  #else
+  knownSsid = WiFi.SSID();
+  #endif
+  knownIp = apActive ? IPAddress(4, 3, 2, 1) : WiFi.localIP();
+  knownBrightness = bri;
+  knownMode = strip.getMainSegment().mode;
+  knownPalette = strip.getMainSegment().palette;
+
+  estimatedMilliamps = strip.currentMilliamps;
+
+  rtIp = realtimeIP;
+  rtMode = realtimeMode;
+}
+
 void displayData() {
   // Clears Screen
-  // tft.fillScreen(TFT_BLACK);
-  tft.fillScreen(TFT_RED);
+  tft.fillScreen(TFT_BLACK);
   // Serial.println("Fill Screen Black");
 
-  tft.setTextSize(2);
   // First row with Wifi name
+  tft.setTextSize(2);
   tft.setCursor(1, 1);
   tft.print(knownSsid);
   // Print `~` char to indicate that SSID is longer, than our dicplay
@@ -137,31 +155,18 @@ void displayData() {
   // Second row with AP IP and Password or IP
   tft.setTextSize(2);
   tft.setCursor(1, 22);
+  tft.print("IP: ");
+  tft.print(knownIp);
 
-  if (apActive) {
-    tft.print("AP IP: ");
-    tft.print(knownIp);
-
-    tft.setCursor(1,44);
-    tft.print("AP Pass:");
-    tft.print(apPass);
-  }
-  else {
-    tft.print("IP: ");
-    tft.print(knownIp);
-
+  if (realtimeMode != REALTIME_MODE_E131) {
+    tft.setTextSize(2);
     tft.setCursor(1,44);
     tft.print("Brightness: ");
     tft.print(((float(bri)/255)*100));
     tft.print("%");
-  }
 
-  if (realtimeMode == REALTIME_MODE_E131) {
-    tft.setCursor(1, 66);
-    tft.print("RT IP: ");
-    tft.print(rtIp);
-  } else {
     // Third row with mode name
+    tft.setTextSize(2);
     tft.setCursor(1, 66);
     char lineBuffer[tftcharwidth+1];
     extractModeName(knownMode, JSON_mode_names, lineBuffer, tftcharwidth);
@@ -171,13 +176,34 @@ void displayData() {
     tft.setCursor(1, 88);
     extractModeName(knownPalette, JSON_palette_names, lineBuffer, tftcharwidth);
     tft.print(lineBuffer);
+  } else { 
+    tft.setCursor(1, 44);
+    tft.print("sACN Mode");
+    tft.setCursor(1, 66);
+    tft.print(MDNS_NAME);
+
+    tft.setCursor(1, 88);
+    tft.print(rtIp);
   }
 
   // Fifth row with estimated mA usage
+  tft.setTextSize(2);
   tft.setCursor(1, 110);
   // Print estimated milliamp usage (must specify the LED type in LED prefs for this to be a reasonable estimate).
-  tft.print(strip.currentMilliamps);
-  tft.print("mA ");
+  if (strip.currentMilliamps < 1000) {
+    tft.print(strip.currentMilliamps);
+    tft.print(" mA");
+  } else {
+    tft.print((double)strip.currentMilliamps / 1000);
+    tft.print(" A");
+  }
+  tft.print(" - ");
+  
+  int vref = 1100;
+  uint16_t v = analogRead(ADC_PIN);
+  float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
+  String voltage = String(battery_voltage) + "V";
+  tft.print(voltage);
 }
 
 void userLoop() {
@@ -187,18 +213,6 @@ void userLoop() {
     return;
   }
   lastUpdateCheck = millis();
-
-  // if (displayTurnedOff == false) {
-  //   tft.fillScreen(TFT_GREEN);
-  //   // digitalWrite(TFT_BL, LOW);
-  //   displayTurnedOff = true;
-  //   Serial.println("Setting Screen to 'GREEN'");
-  // } else {
-  //   // digitalWrite(TFT_BL, HIGH);
-  //   tft.fillScreen(TFT_RED);
-  //   displayTurnedOff = false;
-  //   Serial.println("Setting Screen to 'RED'");
-  // }
   
   // Turn off display after 5 minutes with no Data change.
   if(!displayTurnedOff && millis() - lastRedraw > 5*60*1000) {
@@ -222,21 +236,7 @@ void userLoop() {
     displayTurnedOff = false;
   }
 
-  // Update last known values.
-  #if defined(ESP8266)
-  knownSsid = apActive ? WiFi.softAPSSID() : WiFi.SSID();
-  #else
-  knownSsid = WiFi.SSID();
-  #endif
-  knownIp = apActive ? IPAddress(4, 3, 2, 1) : WiFi.localIP();
-  knownBrightness = bri;
-  knownMode = strip.getMainSegment().mode;
-  knownPalette = strip.getMainSegment().palette;
-
-  estimatedMilliamps = strip.currentMilliamps;
-
-  rtIp = realtimeIP;
-  rtMode = realtimeMode;
+  setData();
 
   displayData();  
 }
