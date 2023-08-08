@@ -34,11 +34,22 @@
 #define TFT_SLPIN   0x10
 #endif
 
-#define TFT_MOSI            19
-#define TFT_SCLK            18
-#define TFT_CS              5
-#define TFT_DC              16
-#define TFT_RST             23
+#ifndef TFT_MOSI
+#define TFT_MOSI 19
+#endif
+#ifndef TFT_SCLK
+#define TFT_SCLK 18
+#endif
+#ifndef TFT_CS
+#define TFT_CS 5
+#endif
+#ifndef TFT_DC
+#define TFT_DC 16
+#endif
+#ifndef TFT_RST
+#define TFT_RST 23
+#endif
+
 #define TFT_BACKLIGHT_ON   HIGH
 
 #define TFT_BL          4  // Display backlight control pin
@@ -51,7 +62,8 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 void userSetup() {
     Serial.println("Start");
     
-    tft.init();
+    // tft.init();
+    tft.begin();
     tft.setRotation(3);  //Rotation here is set up for the text to be readable with the port on the left. Use 1 to flip.
     tft.fillScreen(TFT_BLACK);
 
@@ -94,10 +106,16 @@ uint16_t estimatedMilliamps = 0;
 long lastUpdateCheck = 0;
 long lastRedraw = 0;
 bool displayTurnedOff = false;
+bool initialLoad = true;
 // How often we are redrawing screen
 #define USER_LOOP_REFRESH_RATE_MS 2000
 
 boolean hasDataChanged() {
+  if (initialLoad) {
+    initialLoad = false;
+    return true;
+  }
+
   if (((apActive) ? String(apSSID) : WiFi.SSID()) != knownSsid) {
     return true;
   } else if (knownIp != (apActive ? IPAddress(4, 3, 2, 1) : WiFi.localIP())) {
@@ -135,6 +153,69 @@ void setData() {
 
   rtIp = realtimeIP;
   rtMode = realtimeMode;
+}
+
+void displayBatteryPercentage() {
+  int vref = 1100;
+  uint16_t v = analogRead(ADC_PIN);
+  float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
+  int percentage = 0;
+  if (battery_voltage >= 4.2) {
+    percentage = 100;
+  } else if (battery_voltage >= 4.15) {
+    percentage = 95;
+  } else if (battery_voltage >= 4.11) {
+    percentage = 90;
+  } else if (battery_voltage >= 4.08) {
+    percentage = 85;
+  } else if (battery_voltage >= 4.02) {
+    percentage = 80;
+  } else if (battery_voltage >= 3.98) {
+    percentage = 75;
+  } else if (battery_voltage >= 3.95) {
+    percentage = 70;
+  } else if (battery_voltage >= 3.91) {
+    percentage = 65;
+  } else if (battery_voltage >= 3.87) {
+    percentage = 60;
+  } else if (battery_voltage >= 3.85) {
+    percentage = 55;
+  } else if (battery_voltage >= 3.84) {
+    percentage = 50;
+  } else if (battery_voltage >= 3.82) {
+    percentage = 45;
+  } else if (battery_voltage >= 3.8) {
+    percentage = 40;
+  } else if (battery_voltage >= 3.79) {
+    percentage = 35;
+  } else if (battery_voltage >= 3.77) {
+    percentage = 30;
+  } else if (battery_voltage >= 3.75) {
+    percentage = 25;
+  } else if (battery_voltage >= 3.73) {
+    percentage = 20;
+  } else if (battery_voltage >= 3.71) {
+    percentage = 15;
+  } else if (battery_voltage >= 3.69) {
+    percentage = 10;
+  } else if (battery_voltage >= 3.61) {
+    percentage = 5;
+  } else {
+    percentage = 0;
+  }
+
+  if (percentage > 30) {
+    tft.setTextColor(TFT_GREEN);
+  } else if (percentage > 10) {
+    tft.setTextColor(TFT_YELLOW);
+  } else {
+    tft.setTextColor(TFT_RED);
+  }
+  
+  // String voltage = String(battery_voltage) + "V";
+  String value = String(percentage) + "%";
+  tft.print(value);
+  tft.setTextColor(TFT_WHITE);
 }
 
 void displayData() {
@@ -198,12 +279,8 @@ void displayData() {
     tft.print(" A");
   }
   tft.print(" - ");
-  
-  int vref = 1100;
-  uint16_t v = analogRead(ADC_PIN);
-  float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
-  String voltage = String(battery_voltage) + "V";
-  tft.print(voltage);
+
+  displayBatteryPercentage();
 }
 
 void userLoop() {
@@ -223,8 +300,10 @@ void userLoop() {
 
   // Check if values which are shown on display changed from the last time.
   if (!hasDataChanged()) {
+    Serial.println("No Data Changed");
     return;
   }
+  Serial.println("Data Changed");
 
   // Serial.println("----------------------");
   lastRedraw = millis();
