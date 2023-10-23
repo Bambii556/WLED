@@ -22,7 +22,7 @@
 
 #include "wled.h"
 #include <TFT_eSPI.h>
-#include <SPI.h>
+// #include <SPI.h>
 #include "WiFi.h"
 #include <Wire.h>
 
@@ -62,26 +62,26 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 void userSetup() {
     Serial.println("Start");
     
-    // tft.init();
-    tft.begin();
+    tft.init();
     tft.setRotation(3);  //Rotation here is set up for the text to be readable with the port on the left. Use 1 to flip.
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_RED);
 
     tft.setTextSize(2);
     tft.setTextColor(TFT_WHITE);
-    tft.setCursor(1, 10);
+    // tft.setCursor(1, 10);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(3);
-    tft.print("Loading...");
+    // tft.setTextSize(3);
+    // tft.print("Loading...");
+    tft.drawString("Loading...",1,10,3);
 
-    if (TFT_BL > 0) { // TFT_BL has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-      pinMode(TFT_BL, OUTPUT); // Set backlight pin to output mode
-      digitalWrite(TFT_BL, HIGH); // Turn backlight on. 
-      Serial.println("Setting TFT_BL : HIGH");
-    } else {
-      digitalWrite(TFT_BL, LOW);
-      Serial.println("Setting TFT_BL : LOW");
-    }
+    // if (TFT_BL > 0) { // TFT_BL has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
+    //   pinMode(TFT_BL, OUTPUT); // Set backlight pin to output mode
+    //   digitalWrite(TFT_BL, HIGH); // Turn backlight on. 
+    //   Serial.println("Setting TFT_BL : HIGH");
+    // } else {
+    //   digitalWrite(TFT_BL, LOW);
+    //   Serial.println("Setting TFT_BL : LOW");
+    // }
 }
 
 // gets called every time WiFi is (re-)connected. Initialize own network
